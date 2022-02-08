@@ -1,4 +1,9 @@
+import random
 from PIL import Image
+import string
+from picamera import PiCamera
+from time import sleep
+
 
 """
 General work flow
@@ -13,8 +18,8 @@ Enrollement
     5. Use nfiq to determine the quality of the fingerprint image, if it is above a certain score then proceed, otherwise repeat step 4
     6. Use pcasys to classify fingerprint image
     7. Use 'cwsq .75 *filename*' to convert to a WSQ compressed file
-    8. Use mindtct to extract minutiae
-    9. Find way to pump identifying info from step 1, classification from step 6, and minutiae info stored in the .xyt file generated from mindtct to database
+    8. Make temporary directory to host mindtct result files
+    9. Run mindtct, read .xyt file into database, kill tmp directory
 
 Verification
     May want to change to use pcasys as a potential "quick negative", would improve best case running speed but worsen worst case
@@ -41,3 +46,25 @@ Identification
     9. Compare this minutiae data with the captured fingerprint image's minutiae data
     10. If one is eventually found then pass, otherwise fail
 """
+
+def enrollment():
+    name = input("Please enter your name: ")
+    print("Please press finger againist prism")
+
+
+def verification():
+    print("test2")
+
+
+def identification():
+    print("test3")
+
+camera = PiCamera()
+choice = int(input("Hello welcome to our fingerprint scanner, please select from the following: \n 1. Enrollment \n 2. Verification \n 3. Identification \n"))
+if(choice == 1):
+    enrollment()
+if(choice == 2):
+    verification()
+if(choice == 3):
+    identification()
+
