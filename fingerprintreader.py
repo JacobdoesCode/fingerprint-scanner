@@ -4,7 +4,7 @@ import random
 from PIL import Image
 import string
 from time import sleep
-import _sqlite3 
+import sqlite3 
 import tempfile
 import os
 
@@ -51,7 +51,7 @@ Identification
     10. If one is eventually found then pass, otherwise fail
 """
 def convert_to_grayscale(image,temp_directory):
-    grayscale_image=Image.open("C:\\Users\\jacob\\Desktop\\Fingerprints\\"+image).convert('L')
+    grayscale_image=Image.open("/home/jacob-mcclain/Desktop/fingerprints/"+image).convert('L')
     save_directory= os.path.join(temp_directory,'grayscale_image.jpg')
     grayscale_image.save(save_directory)
     return save_directory
@@ -60,21 +60,25 @@ def run_mindtct(image):
     with tempfile.TemporaryDirectory() as temp_directory:
         source_file_path=convert_to_grayscale(image,temp_directory)
         result_file_path = os.path.join(temp_directory,'output')
-        subprocess.check_call(['bash', '-i', '-c', 'mindtct', source_file_path, "output"]) # bash -i -c should be deleted after moving to linux
-        file = open('output.xyt')
+        subprocess.check_call(['mindtct', source_file_path, result_file_path]) 
+        file = open(result_file_path+'.xyt')
         result_file = file.read()
         file.close()
     return result_file
     
 
 def enrollment():
-    name = input("Please make a username: ")
+    username = input("Please make a username: ")
     # Add check to see if username has been used before 
     print("Please press finger againist prism")
-    image = random.choice(os.listdir("C:\\Users\\jacob\\Desktop\\Fingerprints"))
+    image = random.choice(os.listdir("/home/jacob-mcclain/Desktop/fingerprints"))
     mindtct_results = run_mindtct(image)
-    print("hellooooo")
-
+    con = sqlite3.connect('/home/jacob-mcclain/Desktop/fingerprint-database/fingerprints')
+    cur = con.cursor()
+    SQL='''INSERT INTO fingerprints(publicId,minutiaeDetection) VALUES(?,?)'''
+    cur.execute(SQL,(username,mindtct_results))
+    con.commit()
+    con.close()
 def verification():
     print("test2")
 
