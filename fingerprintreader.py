@@ -173,6 +173,7 @@ def successfulIdentification(minutiae):
 
 # Compares a fingerprint againist all fingerprints in database until it finds a match
 # Improvement: Classification priority to improve best case run time
+# Improvement: Use Bozorth3 one-to-many function instead
 def identification():
     print("Please press finger againist prism")
     # Grabs random image from fingerprint directory I have on my desktop, will be replaced once camera is setup
