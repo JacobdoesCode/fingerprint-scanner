@@ -47,6 +47,8 @@ Identification
     9. If one is eventually found then pass, otherwise fail
 """
 
+# Improvement: Reorder functions
+
 # Runs terminal command that gets match score
 def run_bozorth3(probe_info, gallery_info):
     # Creates two temporary files with the .xyt file extension
@@ -71,7 +73,7 @@ def run_bozorth3(probe_info, gallery_info):
 def bad_fingerprint(temp_directory):
     print("Sorry we did not get a good enough picture, please try again!")
     shutil.rmtree(temp_directory)
-    enrollment()
+    take_image()
 
 # Runs terminal command that checks fingerprint quality
 def run_nfiq(grayscale_image_path):
@@ -112,15 +114,18 @@ def run_mindtct(image):
         result_file = file.read()
         file.close()
     return result_file
-    
-# Gets username, fingerprint minutiae data and sends it to database
-# Improvement: Make image collecting own function
-# Improvement: Add check to see if username has been used before 
-def enrollment():
-    username = input("Please make a username: ")
+
+def take_image():
     print("Please press finger againist prism")
     # Grabs random image from fingerprint directory I have on my desktop, will be replaced once camera is setup
     image = random.choice(os.listdir("/home/jacob-mcclain/Desktop/fingerprints"))
+    return image
+    
+# Gets username, fingerprint minutiae data and sends it to database
+# Improvement: Add check to see if username has been used before 
+def enrollment():
+    username = input("Please make a username: ")
+    image = take_image()
     mindtct_results = run_mindtct(image)
     con = sqlite3.connect('/home/jacob-mcclain/Desktop/fingerprint-database/fingerprints')
     cur = con.cursor()
