@@ -23,7 +23,7 @@ Enrollement
     8. Make temporary directory to host mindtct result files
     9. Run mindtct, read .xyt file into database, kill tmp directory
 
---Verification
+Verification
     May want to change to use pcasys as a potential "quick negative", would improve best case running speed but worsen worst case
     1. Ask user for identifying info
     2. Ask user to press finger againist prism
@@ -33,24 +33,26 @@ Enrollement
     6. Use mindtct to extract minutiae
     7. Pull minutiae info from database row with matching identifying info
     8. Use BOZORTH3 to compare minutiae
-    9. If the match score reaches a certain score (There's a suggested score in the user's guide) then pass, otherwise fail   
+    9. If the match score reaches a certain score (according to guide above 40 is considered a true match) then pass, otherwise fail   
    
---Identification
+Identification
     1. Ask user to press finger againist prism
     2. Capture image 
     3. Use Pillow to convert the image to grayscale
     4. Use nfiq to determine the quality of the fingerprint image, if it is above a certain score then proceed, otherwise repeat step 2
-    5. Use pcasys to classify fingerprint image
+   -- 5. Use pcasys to classify fingerprint image
     6. Use mindtct to extract mintuiae 
     7. Pull fingerprint minutiae data from database rows with matching classification 
     8. Compare this minutiae data with the captured fingerprint image's minutiae data
     9. If one is eventually found then pass, otherwise fail
 """
+
 # Runs terminal command that gets match score
 def run_bozorth3(probe_info, gallery_info):
-    print("Verifying identity!")
+    # Creates two temporary files with the .xyt file extension
     with tempfile.NamedTemporaryFile(suffix=".xyt") as temp_probe_file:
         with tempfile.NamedTemporaryFile(suffix=".xyt") as temp_gallery_file:
+            # Opens up both temporary files and writes the values of input arguments
             probe_file_open = open(temp_probe_file.name,"w")
             probe_file_open.write(probe_info)
             probe_file_open.close()
@@ -58,10 +60,11 @@ def run_bozorth3(probe_info, gallery_info):
             gallery_file_open = open(temp_gallery_file.name,"w")
             gallery_file_open.write(gallery_info)
             gallery_file_open.close()
-            print(temp_probe_file.name)
-            print(temp_gallery_file.name)
+
+            # Uses Bozorth3 to get the match score of the input arguments
             bozorth3_process=subprocess.Popen(['bozorth3', temp_probe_file.name, temp_gallery_file.name],stdout=subprocess.PIPE)
             bozorth3_result= bozorth3_process.communicate()
+    # Returns match score
     return int(bozorth3_result[0])
 
 # Deletes temporary directory and restarts enrollment process 
@@ -83,9 +86,12 @@ def convert_to_grayscale(image,temp_directory):
     grayscale_image=Image.open("/home/jacob-mcclain/Desktop/fingerprints/"+image).convert('1')
     save_directory= os.path.join(temp_directory,'grayscale_image.jpg')
     grayscale_image.save(save_directory)
+    # Runs fingerprint quality check
     nfiq_score = run_nfiq(save_directory)
+    # If quality check succeeds then carry on with minutiae extraction
     if nfiq_score>=3:
         return save_directory
+    # If quality check fails then restart enrollment 
     else:
         bad_fingerprint(temp_directory)
         sys.exit()
@@ -108,10 +114,10 @@ def run_mindtct(image):
     return result_file
     
 # Gets username, fingerprint minutiae data and sends it to database
-# Improvement: make image collecting own function
+# Improvement: Make image collecting own function
+# Improvement: Add check to see if username has been used before 
 def enrollment():
     username = input("Please make a username: ")
-    # Add check to see if username has been used before 
     print("Please press finger againist prism")
     # Grabs random image from fingerprint directory I have on my desktop, will be replaced once camera is setup
     image = random.choice(os.listdir("/home/jacob-mcclain/Desktop/fingerprints"))
@@ -123,24 +129,68 @@ def enrollment():
     con.commit()
     con.close()
 
+# Allows user to claim an identity and uses fingerprint recognization to see if they are who they say 
+# Improvement: Add check to see if username exists
 def verification():
     username = input("Please enter your username: ")
-    # Add check to see if username exists
     print("Please press finger againist prism")
     # Grabs random image from fingerprint directory I have on my desktop, will be replaced once camera is setup
-    image = "L_index_gray.jpg"
+    image = random.choice(os.listdir("/home/jacob-mcclain/Desktop/fingerprints"))
     mindtct_results = run_mindtct(image)
     con = sqlite3.connect('/home/jacob-mcclain/Desktop/fingerprint-database/fingerprints')
     cur = con.cursor()
+    # Runs SQL query to find minutiae features of claimed identity
     SQL='''SELECT minutiaeDetection FROM fingerprints WHERE publicId=?'''
     cur.execute(SQL,(username,))
     row = cur.fetchone()
     con.commit()
     con.close()
-    print(run_bozorth3(mindtct_results, row[0]))
+    print("Verifying identity!")
+    # Attempts to match input fingerprint to fingerprint of claimed identity
+    match_score = run_bozorth3(mindtct_results, row[0])
+    if match_score >40:
+        print("Identity verified")
+    else:
+        print("Verification failed")
+        verification()
+        sys.exit()
 
+# Called from identification upon successful fingerprint match
+def successfulIdentification(minutiae):
+    con = sqlite3.connect('/home/jacob-mcclain/Desktop/fingerprint-database/fingerprints')
+    cur = con.cursor()
+    SQL='''SELECT publicId FROM fingerprints WHERE minutiaeDetection=?'''
+    cur.execute(SQL,(minutiae,))
+    row = cur.fetchone()
+    con.close()
+    print("Match found with user", row[0])
+    sys.exit()
+
+# Compares a fingerprint againist all fingerprints in database until it finds a match
+# Improvement: Classification priority to improve best case run time
 def identification():
-    print("test3")
+    print("Please press finger againist prism")
+    # Grabs random image from fingerprint directory I have on my desktop, will be replaced once camera is setup
+    image = random.choice(os.listdir("/home/jacob-mcclain/Desktop/fingerprints"))
+    print("Input Image", image)
+    print('Searching for fingerprint match!')
+    mindtct_results = run_mindtct(image)
+    con = sqlite3.connect('/home/jacob-mcclain/Desktop/fingerprint-database/fingerprints')
+    cur = con.cursor()
+    # Runs SQL query to grab all minutiae features in database
+    SQL='''SELECT minutiaeDetection FROM fingerprints'''
+    cur.execute(SQL)
+    rows = cur.fetchall()
+    con.close()
+    print("Beginning identification!")
+    # Runs through all rows in database, attempting to match them with input fingerprint
+    for row in rows:
+        match_score = run_bozorth3(mindtct_results, row[0])
+        if match_score>40:
+            successfulIdentification(row[0])
+    print("No match found, exiting")
+    sys.exit()
+
 
 # Start, get user choice
 choice = int(input("Hello welcome to our fingerprint scanner, please select from the following: \n 1. Enrollment \n 2. Verification \n 3. Identification \n"))
