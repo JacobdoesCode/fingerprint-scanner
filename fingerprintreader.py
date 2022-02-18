@@ -20,9 +20,8 @@ Enrollement
     4. Use Pillow to convert the image to grayscale
     6. Use nfiq to determine the quality of the fingerprint image, if it is above a certain score then proceed, otherwise repeat step 4
    -- 7. Use pcasys to classify fingerprint image
-   -- 8. Use 'cwsq .75 *filename*' to convert to a WSQ compressed file
-    9. Make temporary directory to host mindtct result files
-    10. Run mindtct, read .xyt file into database, kill tmp directory
+    8. Make temporary directory to host mindtct result files
+    9. Run mindtct, read .xyt file into database, kill tmp directory
 
 --Verification
     May want to change to use pcasys as a potential "quick negative", would improve best case running speed but worsen worst case
@@ -31,11 +30,10 @@ Enrollement
     3. Capture image 
     4. Use Pillow to convert the image to grayscale
     5. Use nfiq to determine the quality of the fingerprint image, if it is above a certain score then proceed, otherwise repeat step 3
-    6. Use 'cwsq .75 *filename*' to convert to a WSQ compressed file
-    7. Use mindtct to extract minutiae
-    8. Pull minutiae info from database row with matching identifying info
-    9. Use BOZORTH3 to compare minutiae
-   10. If the match score reaches a certain score (There's a suggested score in the user's guide) then pass, otherwise fail   
+    6. Use mindtct to extract minutiae
+    7. Pull minutiae info from database row with matching identifying info
+    8. Use BOZORTH3 to compare minutiae
+    9. If the match score reaches a certain score (There's a suggested score in the user's guide) then pass, otherwise fail   
    
 --Identification
     1. Ask user to press finger againist prism
@@ -43,12 +41,29 @@ Enrollement
     3. Use Pillow to convert the image to grayscale
     4. Use nfiq to determine the quality of the fingerprint image, if it is above a certain score then proceed, otherwise repeat step 2
     5. Use pcasys to classify fingerprint image
-    6. Use 'cwsq .75 *filename*' to convert to a WSQ compressed file
-    7. Use mindtct to extract mintuiae 
-    8. Pull fingerprint minutiae data from database rows with matching classification 
-    9. Compare this minutiae data with the captured fingerprint image's minutiae data
-    10. If one is eventually found then pass, otherwise fail
+    6. Use mindtct to extract mintuiae 
+    7. Pull fingerprint minutiae data from database rows with matching classification 
+    8. Compare this minutiae data with the captured fingerprint image's minutiae data
+    9. If one is eventually found then pass, otherwise fail
 """
+# Runs terminal command that gets match score
+def run_bozorth3(probe_info, gallery_info):
+    print("Verifying identity!")
+    with tempfile.NamedTemporaryFile(suffix=".xyt") as temp_probe_file:
+        with tempfile.NamedTemporaryFile(suffix=".xyt") as temp_gallery_file:
+            probe_file_open = open(temp_probe_file.name,"w")
+            probe_file_open.write(probe_info)
+            probe_file_open.close()
+
+            gallery_file_open = open(temp_gallery_file.name,"w")
+            gallery_file_open.write(gallery_info)
+            gallery_file_open.close()
+            print(temp_probe_file.name)
+            print(temp_gallery_file.name)
+            bozorth3_process=subprocess.Popen(['bozorth3', temp_probe_file.name, temp_gallery_file.name],stdout=subprocess.PIPE)
+            bozorth3_result= bozorth3_process.communicate()
+    return int(bozorth3_result[0])
+
 # Deletes temporary directory and restarts enrollment process 
 def bad_fingerprint(temp_directory):
     print("Sorry we did not get a good enough picture, please try again!")
@@ -69,7 +84,6 @@ def convert_to_grayscale(image,temp_directory):
     save_directory= os.path.join(temp_directory,'grayscale_image.jpg')
     grayscale_image.save(save_directory)
     nfiq_score = run_nfiq(save_directory)
-    print(nfiq_score)
     if nfiq_score>=3:
         return save_directory
     else:
@@ -94,6 +108,7 @@ def run_mindtct(image):
     return result_file
     
 # Gets username, fingerprint minutiae data and sends it to database
+# Improvement: make image collecting own function
 def enrollment():
     username = input("Please make a username: ")
     # Add check to see if username has been used before 
@@ -109,8 +124,20 @@ def enrollment():
     con.close()
 
 def verification():
-    print("test2")
-
+    username = input("Please enter your username: ")
+    # Add check to see if username exists
+    print("Please press finger againist prism")
+    # Grabs random image from fingerprint directory I have on my desktop, will be replaced once camera is setup
+    image = "L_index_gray.jpg"
+    mindtct_results = run_mindtct(image)
+    con = sqlite3.connect('/home/jacob-mcclain/Desktop/fingerprint-database/fingerprints')
+    cur = con.cursor()
+    SQL='''SELECT minutiaeDetection FROM fingerprints WHERE publicId=?'''
+    cur.execute(SQL,(username,))
+    row = cur.fetchone()
+    con.commit()
+    con.close()
+    print(run_bozorth3(mindtct_results, row[0]))
 
 def identification():
     print("test3")
