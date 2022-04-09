@@ -1,6 +1,8 @@
 import subprocess
 import random
 from PIL import Image
+import string
+from time import sleep
 import sqlite3 
 import tempfile
 import os
@@ -8,6 +10,8 @@ import shutil
 import sys
 from cryptography.fernet import Fernet
 import hashlib
+from time import sleep
+from picamera import PiCamera
 
 """
 General work flow
@@ -88,7 +92,7 @@ def enrollment():
     mindtct_results = run_mindtct(image)
     hashed_minutiae=hashlib.sha3_224(mindtct_results.encode('utf-8'))
     mindtct_results = encrypt(mindtct_results)
-    con = sqlite3.connect('./fingerprints')
+    con = sqlite3.connect('./fingerprints.db')
     cur = con.cursor()
     SQL='''INSERT INTO fingerprints(publicId,minutiaeDetection,publicIdHash,minutiaeDetectionHash) VALUES(?,?,?,?)'''
     cur.execute(SQL,(username,mindtct_results,hashed_user.digest(),hashed_minutiae.digest()))
@@ -101,7 +105,7 @@ def verification():
     username = input("Please enter your username: ")
     image = take_image()
     mindtct_results = run_mindtct(image)
-    con = sqlite3.connect('./fingerprints')
+    con = sqlite3.connect('./fingerprints.db')
     cur = con.cursor()
     # Runs SQL query to find minutiae features of claimed identity
     hashed_user=hashlib.sha3_224(username.encode('utf-8'))
@@ -132,7 +136,7 @@ def identification():
     print("Input Image", image)
     print('Searching for fingerprint match!')
     mindtct_results = run_mindtct(image)
-    con = sqlite3.connect('./fingerprints')
+    con = sqlite3.connect('./fingerprints.db')
     cur = con.cursor()
     # Runs SQL query to grab all minutiae features in database
     SQL='''SELECT minutiaeDetection FROM fingerprints'''
@@ -155,10 +159,16 @@ def identification():
     sys.exit()
 
 def take_image():
-    print("Please press finger againist prism")
-    # Grabs random image from fingerprint directory I have on my desktop, will be replaced once camera is setup
-    image = random.choice(os.listdir("/home/jacob-mcclain/Desktop/fingerprints"))
-    print(image)
+    image = "fingerprint.jpg"
+    camera = PiCamera()
+    camera.resolution = (1024,768)
+    camera.rotation=90
+    camera.sharpness=100
+    camera.start_preview()
+    sleep(2)
+    sleep(1)
+    camera.capture(image)
+    camera.close()
     return image
 
 # Generates fingerprint minutiae data
@@ -171,7 +181,7 @@ def run_mindtct(image):
         # Sets up a file path for the minutiae output
         result_file_path = os.path.join(temp_directory,'output')
         # Get minutiae data
-        subprocess.check_call(['mindtct', source_file_path, result_file_path]) 
+        subprocess.check_call(['/home/pi/Documents/bin/mindtct', source_file_path, result_file_path]) 
         # Read minutiae data into file
         file = open(result_file_path+'.xyt')
         result_file = file.read()
@@ -181,7 +191,7 @@ def run_mindtct(image):
 # Generates grayscale image
 def convert_to_grayscale(image,temp_directory):
     print("Converting to Grayscale!")
-    grayscale_image=Image.open("/home/jacob-mcclain/Desktop/fingerprints/"+image).convert('1')
+    grayscale_image=Image.open("./"+image).convert('1')
     save_directory= os.path.join(temp_directory,'grayscale_image.jpg')
     grayscale_image.save(save_directory)
     # Runs fingerprint quality check
@@ -197,15 +207,15 @@ def convert_to_grayscale(image,temp_directory):
 # Runs terminal command that checks fingerprint quality
 def run_nfiq(grayscale_image_path):
     print("Checking fingerprint quality!")
-    nfiq_process=subprocess.Popen(['nfiq', grayscale_image_path],stdout=subprocess.PIPE)
+    nfiq_process=subprocess.Popen(["/home/pi/Documents/bin/nfiq" , grayscale_image_path],stdout=subprocess.PIPE)
     nfiq_result= nfiq_process.communicate()
+    print("Fingerprint quality score ",nfiq_result[0])
     return int(nfiq_result[0])
 
 # Deletes temporary directory and restarts enrollment process 
 def bad_fingerprint(temp_directory):
-    print("Sorry we did not get a good enough picture, please try again!")
-    shutil.rmtree(temp_directory)
-    take_image()
+    print("Sorry we did not get a good enough picture, exiting")
+    sys.exit()
 
 # Runs terminal command that gets match score
 def run_bozorth3_one_to_one(probe_info, gallery_info):
@@ -222,7 +232,7 @@ def run_bozorth3_one_to_one(probe_info, gallery_info):
             gallery_file_open.close()
 
             # Uses Bozorth3 to get the match score of the input arguments
-            bozorth3_process=subprocess.Popen(['bozorth3', temp_probe_file.name, temp_gallery_file.name],stdout=subprocess.PIPE)
+            bozorth3_process=subprocess.Popen(['/home/pi/Documents/bin/bozorth3', temp_probe_file.name, temp_gallery_file.name],stdout=subprocess.PIPE)
             bozorth3_result= bozorth3_process.communicate()
     # Returns match score
     return int(bozorth3_result[0])
@@ -249,7 +259,7 @@ def run_bozorth3_one_to_many(probe_info, gallery_info_rows):
         file = open(file_location,"w")
         file.write(row)
         file.close()
-    command = ['bozorth3', '-p', probe_path] + files
+    command = ['/home/pi/Documents/bin/bozorth3', '-p', probe_path] + files
     result = subprocess.check_output(command).strip()
     result_split = result.decode('utf8').split('\n')
     shutil.rmtree(one_to_many_root)
@@ -259,7 +269,7 @@ def run_bozorth3_one_to_many(probe_info, gallery_info_rows):
 # need to change to use hashes
 def successfulIdentification(minutiae):
     hashed_min=hashlib.sha3_224(minutiae.encode('utf-8'))
-    con = sqlite3.connect('./fingerprints')
+    con = sqlite3.connect('./fingerprints.db')
     cur = con.cursor()
     SQL='''SELECT publicId FROM fingerprints WHERE minutiaeDetectionHash=?'''
     cur.execute(SQL,(hashed_min.digest(),))
