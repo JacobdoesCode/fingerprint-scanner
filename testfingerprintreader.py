@@ -147,7 +147,7 @@ def identification():
     match_score = run_bozorth3_one_to_many(mindtct_results, rows)
     print(match_score)
     for i in range(0,len(match_score)):
-        if(int(match_score[i])>40):
+        if(int(match_score[i])>40 and match_score[i]==max(match_score)):
             row=rows[i]
             row = decrypt(row[0])
             successfulIdentification(row)

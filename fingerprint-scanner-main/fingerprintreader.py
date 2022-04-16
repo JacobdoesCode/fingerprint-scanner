@@ -153,7 +153,7 @@ def identification():
     print(match_score)
     # Loops through list of match scores given by the one to many funcion and checks if one is above 20
     for i in range(0,len(match_score)):
-        if(int(match_score[i])>=20):
+        if(int(match_score[i])>=20 and match_score[i]==max(match_score)):
             row=rows[i]
             row = decrypt(row[0])
             # Runs function that outputs that matched user
