@@ -150,14 +150,12 @@ def identification():
     print("Beginning identification!")
     # Runs through all rows in database, attempting to match them with input fingerprint
     match_score = run_bozorth3_one_to_many(mindtct_results, rows)
-    print(match_score)
     # Loops through list of match scores given by the one to many funcion and checks if one is above 20
-    for i in range(0,len(match_score)):
-        if(int(match_score[i])>=20):
-            row=rows[i]
-            row = decrypt(row[0])
-            # Runs function that outputs that matched user
-            successfulIdentification(row)
+    largest_match = max(match_score)
+    if(largest_match>20):
+        largest_match = decrypt(largest_match[0])
+        # Runs function that outputs that matched user
+    successfulIdentification(largest_match)
     # Prints and exits if no user is found
     print("No match found, exiting")
     sys.exit()
