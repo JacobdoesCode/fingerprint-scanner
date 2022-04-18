@@ -152,6 +152,7 @@ def identification():
     match_score = run_bozorth3_one_to_many(mindtct_results, rows)
     print(match_score)
     # Loops through list of match scores given by the one to many funcion and checks if one is above 20
+    match_score = [int(x) for x in match_score]
     for i in range(0,len(match_score)):
         if(int(match_score[i])>=20 and match_score[i]==max(match_score)):
             row=rows[i]
@@ -290,3 +291,4 @@ def successfulIdentification(minutiae):
 
 if __name__ == "__main__":
     main()
+
